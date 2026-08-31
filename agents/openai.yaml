@@ -1,0 +1,7 @@
+interface:
+  display_name: "Pi Agent Delegation"
+  short_description: "Delegate bounded work to Pi agents over RPC"
+  default_prompt: "Use $pi-agent-delegation to delegate this bounded task to Pi and audit the receipt."
+
+policy:
+  allow_implicit_invocation: true
