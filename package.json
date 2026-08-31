@@ -6,7 +6,7 @@
   "description": "A self-contained Codex skill and Pi RPC task controller.",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check scripts/pi-agent.mjs"
+    "check": "node --check skills/pi-agent-delegation/scripts/pi-agent.mjs"
   },
   "engines": {
     "node": ">=20"

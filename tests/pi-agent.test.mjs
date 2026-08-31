@@ -6,11 +6,11 @@ import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 
-import { parseArgs, roleTools, safeEnvironment } from "../scripts/pi-agent.mjs";
+import { parseArgs, roleTools, safeEnvironment } from "../skills/pi-agent-delegation/scripts/pi-agent.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "..");
-const cli = path.join(root, "scripts", "pi-agent.mjs");
+const cli = path.join(root, "skills", "pi-agent-delegation", "scripts", "pi-agent.mjs");
 const fakePi = path.join(root, "tests", "fixtures", "fake-pi.mjs");
 
 async function waitUntilRunning(jobId, env) {
