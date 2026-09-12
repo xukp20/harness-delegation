@@ -1,0 +1,6 @@
+interface:
+  display_name: "Harness Delegation"
+  short_description: "Delegate bounded jobs to external Pi and Grok harnesses"
+  default_prompt: "Use $harness-delegation to delegate this authorized bounded task and audit its receipt."
+policy:
+  allow_implicit_invocation: true

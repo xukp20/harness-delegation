@@ -1,6 +1,6 @@
 interface:
-  display_name: "Pi Agent Delegation"
-  short_description: "Delegate bounded work to Pi agents over RPC"
+  display_name: "Pi Delegation (Compatibility)"
+  short_description: "Legacy Pi entry for Harness Delegation"
   default_prompt: "Use $pi-agent-delegation to delegate this bounded task to Pi and audit the receipt."
 
 policy:

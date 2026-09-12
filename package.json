@@ -1,14 +1,16 @@
 {
-  "name": "pi-agent-delegation",
-  "version": "0.1.0",
+  "name": "harness-delegation",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "A self-contained Codex skill and Pi RPC task controller.",
+  "description": "External Pi and Grok job delegation for native Codex via CLI, Skill, and MCP.",
+  "bin": { "harness-delegate": "bin/harness-delegate.mjs" },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check skills/pi-agent-delegation/scripts/pi-agent.mjs"
+    "check": "node scripts/check.mjs"
   },
   "engines": {
-    "node": ">=20"
-  }
+    "node": ">=22"
+  },
+  "dependencies": { "@modelcontextprotocol/sdk": "1.30.0" }
 }

@@ -1,124 +1,109 @@
-<h1 align="center">Pi Agent Delegation</h1>
+# Harness Delegation
 
-<p align="center">
-  <strong>English</strong> |
-  <a href="README.zh-CN.md">简体中文</a>
-</p>
+[简体中文](README.zh-CN.md)
 
-<p align="center">
-  <strong>Delegate bounded Codex work to external Pi agents over RPC.</strong>
-</p>
+Delegate bounded coding tasks from native Codex Desktop or CLI to **Pi** and **Grok Build**. A small shared job core powers a JSON CLI, a STDIO MCP server, and a Codex Skill. External jobs remain external: Codex retrieves their evidence and verifies their changes.
 
-<p align="center">
-  <a href="skills/pi-agent-delegation/SKILL.md">
-    <img alt="Codex Skill" src="https://img.shields.io/badge/Codex-Skill-2563eb?style=flat-square">
-  </a>
-  <a href="https://nodejs.org/">
-    <img alt="Node.js 20+" src="https://img.shields.io/badge/Node.js-20%2B-172554?style=flat-square">
-  </a>
-  <img alt="Transport" src="https://img.shields.io/badge/transport-Pi%20RPC-0f8f88?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/status-experimental-d97706?style=flat-square">
-</p>
+This repository was previously **Pi Agent Delegation**. The [migration guide](docs/migration.md) covers the old Skill, script, environment variables, and receipts.
 
-<p align="center">
-  <a href="#why-this-exists">Why</a>
-  &middot;
-  <a href="#capabilities">Capabilities</a>
-  &middot;
-  <a href="#install">Install</a>
-  &middot;
-  <a href="skills/pi-agent-delegation/SKILL.md">Skill Reference</a>
-</p>
+## What it provides
 
-Pi Agent Delegation provides the `pi-agent-delegation` skill and a self-contained controller for delegating bounded explorer, reviewer, and worker jobs from Codex to the [Pi coding agent](https://github.com/badlogic/pi-mono). Pi runs as an external worker through its official JSONL RPC mode; Codex remains the orchestrator and audits the persisted result.
-
-The runtime requires only Node.js and the `pi` CLI. It does not depend on Agent Runtime Kit (ARK), although its lifecycle design borrows proven ideas from ARK's Pi adapter: correlated RPC responses, stable session locators, bounded waits, live steering, cancellation, and terminal receipts.
-
-## Why This Exists
-
-Codex subagents are the default choice for ordinary in-process delegation. Pi is useful when the caller deliberately wants an independent external agent runtime, Pi's provider/session configuration, or a persistent RPC job that can be inspected and controlled outside Codex's native agent tree.
-
-This project turns that integration into a narrow, auditable channel instead of asking each Codex task to recreate process supervision and JSONL routing. It does not silently replace native subagents and does not make Pi jobs appear inside the Codex agent tree.
-
-## Capabilities
-
-| Capability | What it provides |
-| --- | --- |
-| Bounded roles | Start Pi as an explorer, reviewer, or authorized worker |
-| Per-job configuration | Select provider, model, thinking level, working directory, tools, and timeout |
-| Detached lifecycle | Start, inspect, wait, cancel, and retrieve a stable terminal receipt |
-| Live control | Steer active work or enqueue a follow-up through the Pi RPC session |
-| Session continuation | Resume a persisted Pi session as a new supervised job |
-| Read-only defaults | Explorer and reviewer roles receive only `read`, `grep`, `find`, and `ls` |
-| Auditable state | Persist request, events, stderr, usage, final text, session locator, and before/after Git snapshots |
-| Credential boundary | Keep Pi OAuth files outside the repository and filter credential-like environment variables by default |
+- Detached per-job supervisors, private persisted state, terminal receipts, and bounded event reads.
+- Pi's native JSONL RPC; Grok-specific ACP v1 stdio. Pi is not ACP.
+- Start, list, inspect, wait, cancel, and session continuation; Pi additionally supports steer/follow-up.
+- Idempotent start/control keys, exclusive bridge writers per Git worktree, and native-session exclusion.
+- Read-only explorer/reviewer defaults; workers require an explicit authorized write scope.
+- Ordinary MCP tool results. No CodexHost, ARK dependency, app-server proxy, Desktop injection, custom renderer, or Thread database.
 
 ## Install
 
-Install Pi first and configure a provider. For a ChatGPT Plus/Pro account, open Pi, run `/login`, choose **OpenAI Codex**, and complete the device-code login.
+Requires **Linux, Node.js 22+**, and the selected harness CLI already installed and authenticated. Harness installation/login is managed separately. The process identity/recovery implementation uses Linux `/proc`; macOS and Windows are not supported in this version.
 
 ```bash
-git clone https://github.com/xukp20/pi-agent-delegation.git
-cd pi-agent-delegation
+git clone https://github.com/xukp20/harness-delegation.git
+cd harness-delegation
+npm ci --ignore-scripts
+node bin/harness-delegate.mjs doctor
+```
+
+The CLI/core have no external runtime imports; `npm ci` installs the MCP SDK for the MCP entry. No npm package has been published by this project. Run the script directly or use `npm link` to expose `harness-delegate` locally.
+
+Configure binaries and defaults in `~/.config/harness-delegation/config.json`:
+
+```json
+{
+  "schema_version": 1,
+  "harnesses": {
+    "pi": {"binary": "/absolute/path/to/pi", "provider": "openai-codex", "model": "gpt-5.6-luna", "thinking": "high"},
+    "grok": {"binary": "/absolute/path/to/grok", "model": "grok-4.6", "thinking": "low"}
+  }
+}
+```
+
+Optional local keys: `state_dir`; harness `allow_env` (names only), `log_bytes` (1 KiB–16 MiB), and Grok `home` (existing native auth home). Override the config path with `HARNESS_DELEGATION_CONFIG`; state defaults to `~/.local/state/harness-delegation` and can be overridden with `HARNESS_DELEGATION_DIR`. Use one private local state root across CLI/MCP clients that must coordinate.
+
+`doctor` checks executable/version availability; it does **not** prove credentials are valid or send a model prompt. Version targets and real verification evidence are in [verification](docs/verification.md).
+
+## Codex integration
+
+Link the Skill from the complete checkout (copying just the Skill directory is insufficient):
+
+```bash
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
-ln -s "$PWD/skills/pi-agent-delegation" \
-  "${CODEX_HOME:-$HOME/.codex}/skills/pi-agent-delegation"
+ln -s "$PWD/skills/harness-delegation" "${CODEX_HOME:-$HOME/.codex}/skills/harness-delegation"
 ```
 
-Reload Codex after installation so the skill is discovered. A linked install can be updated with `git pull --ff-only`.
+Add an optional STDIO MCP entry to Codex's config, using actual absolute paths:
 
-## Verify
+```toml
+[mcp_servers.harness_delegation]
+command = "/absolute/path/to/node"
+args = ["/absolute/path/to/harness-delegation/bin/harness-delegate.mjs", "mcp"]
+tool_timeout_sec = 60
+```
+
+Reload Codex after updating integrations. For Desktop tasks on a remote Linux executor, see [remote SSH setup](docs/remote-ssh.md). No local companion app is required. Tools are `harness_list`, `task_start`, `task_list`, `task_get`, `task_read`, `task_wait`, `task_send`, `task_cancel`, and `task_resume`.
+
+## CLI example
 
 ```bash
-node skills/pi-agent-delegation/scripts/pi-agent.mjs doctor
+node bin/harness-delegate.mjs start --harness grok \
+  --cwd /absolute/repo --role reviewer \
+  --task "Review the parser changes. Return concrete findings with file references." \
+  --request-key parser-review-1
+node bin/harness-delegate.mjs wait JOB_ID --timeout-seconds 30
+node bin/harness-delegate.mjs result JOB_ID
+```
+
+Use `--request-file /absolute/request.json` for structured scope/acceptance. `run` starts and waits in the foreground; `start` returns immediately. Reuse the same key after an ambiguous client response. Never retry an uncertain native message under a new key.
+
+Read the [protocol](docs/protocol.md) for states, schema, capabilities, and errors.
+
+## Boundaries
+
+Tool restrictions and prompts are **not an OS sandbox**. Pi has no built-in permissions system. Native tools run as the launching user; scope strings and Git snapshots cannot prove or enforce filesystem isolation. Bridge workspace/session locks do not constrain unrelated programs. Use separate worktrees for concurrent writers and independently review the diff and run focused checks.
+
+Grok uses a small generated tool profile and a private native Home with an auth-file symlink to the configured original store. It disables auto-update, leader sharing, skill discovery, default tool injection and native subagent tools. Unsupported executable project configuration fails closed; arbitrary native MCP/plugin inheritance is outside v1. Native auth refresh may update the harness's own files. No credential values are copied into launch requests or returned as job metadata.
+
+Only finite base environment names and explicit local `allow_env` names are forwarded; loader injection variables remain blocked. Logs are private and bounded, with known environment-secret redaction. Native output may itself contain sensitive material: do not publish raw runtime directories.
+
+Ordinary CLI exit/MCP reconnect can preserve work. Host reboot, logout cleanup, cgroup termination, and live supervisor replacement are not continuation guarantees. Lost work is never silently replayed. Session resume restores conversation, not workspace files.
+
+## Update and uninstall
+
+Pin a checkout/release directory for active supervisors. Finish/cancel jobs before replacing that installation, or retain the old checkout until its jobs terminate. Update with `git pull --ff-only`, `npm ci --ignore-scripts`, `npm run check`, and `npm test`; re-run no-model probes after harness upgrades.
+
+Uninstall by removing this MCP entry and this project's Skill symlink; run `npm unlink -g harness-delegation` if linked. Keep state, native sessions/auth, and worktrees by default. Uninstall does not cancel active jobs. Purging runtime data is a separate, explicit operator action after confirming all jobs stopped.
+
+## Development
+
+```bash
+npm run check
 npm test
+node scripts/probe.mjs pi
+node scripts/probe.mjs grok
 ```
 
-`doctor` reports whether Node.js, Pi, the selected provider, and refreshable OAuth configuration are available. It never prints credential contents.
+Probes create/load temporary native sessions without prompts, then remove only their temporary state. Tests use fake harnesses; real canaries are separate and potentially billable.
 
-## CLI Example
-
-```bash
-node skills/pi-agent-delegation/scripts/pi-agent.mjs start \
-  --role reviewer \
-  --cwd /path/to/repo \
-  --task "Review HEAD for correctness and return findings first"
-
-node skills/pi-agent-delegation/scripts/pi-agent.mjs status JOB_ID
-node skills/pi-agent-delegation/scripts/pi-agent.mjs steer JOB_ID \
-  --message "Focus on recovery semantics"
-node skills/pi-agent-delegation/scripts/pi-agent.mjs wait JOB_ID \
-  --timeout-seconds 1800
-node skills/pi-agent-delegation/scripts/pi-agent.mjs result JOB_ID
-```
-
-Use `run` for a foreground start-wait-result cycle and `resume --session-file ...` to continue a saved Pi session. Runtime state defaults to `~/.codex/runtime/pi-agent-delegation`.
-
-## Safety Boundaries
-
-- Pi is an external agent, not a native Codex subagent. Codex must independently inspect changes and rerun proportionate verification.
-- Explorer and reviewer jobs have no shell, edit, or write tool. Worker jobs receive those tools only when implementation is authorized.
-- Concurrent writers should use separate worktrees. The controller does not create or merge worktrees automatically.
-- The controller does not copy OAuth credentials into requests, logs, receipts, or this repository.
-- It does not commit, merge, push, or broaden external permissions on behalf of a worker.
-
-## Repository Layout
-
-```text
-pi-agent-delegation/
-├── README.md
-├── README.zh-CN.md
-├── LICENSE
-├── package.json
-├── tests/
-└── skills/
-    └── pi-agent-delegation/
-        ├── SKILL.md
-        ├── agents/openai.yaml
-        ├── references/protocol.md
-        └── scripts/pi-agent.mjs
-```
-
-## Compatibility
-
-The controller targets Pi's current `--mode rpc` protocol and built-in tool names. Run `doctor` and the test suite after updating Pi. The first validated release used Pi `0.82.0` and Node.js `22.23.1`.
+`src/jobs.mjs`, `store.mjs`, and `supervisor.mjs` own lifecycle; `src/adapters/` owns native protocols; `src/cli.mjs` and `mcp.mjs` call the same core. See [verification](docs/verification.md).

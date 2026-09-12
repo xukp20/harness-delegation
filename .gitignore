@@ -1,3 +1,7 @@
 .pi-agent-runtime/
 node_modules/
 *.log
+.harness-delegation/
+runtime/
+.env
+.env.*
