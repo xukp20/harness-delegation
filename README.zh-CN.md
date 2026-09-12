@@ -80,3 +80,7 @@ MCP 工具为 `harness_list`、`task_start`、`task_list`、`task_get`、`task_r
 更新前结束任务，或保留 active supervisor 对应的旧 checkout。执行 `git pull --ff-only`、`npm ci --ignore-scripts`、`npm run check` 和 `npm test`。卸载只移除本项目 MCP 条目和 Skill 链接；状态、session、认证和 worktree 默认保留，也不会自动取消任务。
 
 `doctor` 只验证 binary/version，不证明认证有效，不调用模型。`scripts/probe.mjs pi|grok` 创建并加载临时 session，不发送 prompt。真实 canary 与 fake 测试分开，详见 [验证记录](docs/verification.md)。完整契约见 [协议文档](docs/protocol.md)。
+
+Grok 1.0.30 在 prompt 前通过 `_x.ai/commands/list` 扩展精确校验 live session（活动会话）的真实工具列表，不把可能缺失的通知当作就绪保证。Pi 模型错误保留 `error.details.source=pi_assistant`，与 RPC 送达不明和桥接执行 deadline 区分。桥接会中止观察到的 Pi 自动重试等待，不修改原生设置，也不重发 prompt。发起新的付费尝试前请参考 [故障排查](docs/troubleshooting.md)。
+
+若 shell 直连成功而 MCP 超时，先检查 MCP host（宿主进程）的代理环境。SDK STDIO 客户端默认不继承代理；Codex 可用 `env_vars` 显式转发必要变量，远程 Desktop 应选择 remote 来源。详见 [远程配置](docs/remote-ssh.md)；桥接无法转发宿主未提供的变量。

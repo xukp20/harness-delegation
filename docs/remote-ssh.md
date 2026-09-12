@@ -16,6 +16,18 @@ tool_timeout_sec = 60
 
 For Codex CLI already running on the Linux host, omit `experimental_environment`; ordinary STDIO starts the server there. If remote MCP is unavailable, link the Skill from the remote checkout and use its CLI through the existing remote terminal tools. No companion app, HTTP listener, SSH tunnelling daemon or CodexHost is required.
 
+If the host needs an HTTP proxy, explicitly forward the existing variables needed by that host. Codex supports `env_vars` names for local inheritance and `{ name, source = "remote" }` entries for remote STDIO. For example, add to the remote server table above:
+
+```toml
+env_vars = [
+  { name = "HTTP_PROXY", source = "remote" },
+  { name = "HTTPS_PROXY", source = "remote" },
+  { name = "NO_PROXY", source = "remote" },
+]
+```
+
+For local Codex CLI, use `env_vars = ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"]` instead. Include lowercase or `ALL_PROXY` counterparts only if your deployment uses them. Values must exist in the selected executor environment; never copy a local desktop loopback proxy into a remote host. These are operator examples, not changes applied by this repository. [Official environment-source semantics](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) and [MCP environment troubleshooting](troubleshooting.md) explain the boundary.
+
 The MCP server is a short-lived client of the job store/supervisor. Each job has detached Node and native processes, a private Unix control socket and persistent files. Reconnect by job ID; if the ID is lost use `task_list`. Results are retrieved explicitly and rendered as normal tool output, not native Codex child Threads.
 
 Tests demonstrate child jobs surviving the launching CLI's exit and a real MCP STDIO client closing/reopening. This does **not** prove survival of Desktop task cancellation, remote executor cgroup cleanup, Linux logout policies or reboot. A detached process cannot override host process-tree policy. No systemd service is installed automatically; deployments needing stronger guarantees must validate their host lifecycle before relying on unattended jobs.

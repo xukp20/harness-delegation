@@ -44,6 +44,10 @@ Optional local keys: `state_dir`; harness `allow_env` (names only), `log_bytes` 
 
 `doctor` checks executable/version availability; it does **not** prove credentials are valid or send a model prompt. Version targets and real verification evidence are in [verification](docs/verification.md).
 
+Grok 1.0.30 verifies the live session's exact tool list through its `_x.ai/commands/list` extension before any prompt; unsolicited tool notifications are not a readiness guarantee. Pi model failures retain `error.details.source=pi_assistant`, distinct from RPC delivery failures and bridge execution deadlines. The bridge aborts observed Pi automatic-retry backoff without changing native settings; it never replays the prompt. See [troubleshooting](docs/troubleshooting.md) before starting a new paid attempt.
+
+If direct shell calls work but MCP calls time out, check the MCP host's proxy environment first. SDK STDIO clients do not inherit proxies by default. Codex `env_vars` can explicitly forward required names; remote Desktop must select the remote environment source. See [remote setup](docs/remote-ssh.md); the bridge cannot forward variables its host did not supply.
+
 ## Codex integration
 
 Link the Skill from the complete checkout (copying just the Skill directory is insufficient):

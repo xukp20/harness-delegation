@@ -22,7 +22,7 @@ export async function connect(child, context) {
   const wire = new Wire(child, record => context.native(record), chunk => context.stderr(chunk));
   const command = async (type, payload = {}) => {
     const response = await wire.request({ type, ...payload });
-    if (response.type !== 'response' || response.command !== type || response.success !== true) throw fail('HARNESS_ERROR', response.error || `Invalid Pi response: ${type}`);
+    if (response.type !== 'response' || response.command !== type || response.success !== true) throw fail('HARNESS_ERROR', response.error || `Invalid Pi response: ${type}`, { source: 'pi_rpc_response', command: type });
     return response.data;
   };
   let resolveSettled, rejectSettled; let active = false; let currentAssistant;
@@ -31,6 +31,12 @@ export async function connect(child, context) {
   wire.on('closed', rejectSettled);
   wire.on('record', record => {
     if (active && record.type === 'message_end' && record.message?.role === 'assistant') currentAssistant = record.message;
+    if (active && record.type === 'auto_retry_start') {
+      // Cancel Pi's pending backoff, never replay an ambiguous model request.
+      // set_auto_retry would persist a setting in the user's native Home.
+      context.event('retry.suppressed', { source: 'pi_auto_retry', attempt: record.attempt });
+      void command('abort_retry').catch(rejectSettled);
+    }
     if (active && record.type === 'agent_settled') { context.settling?.(); resolveSettled(); }
     if (record.type === 'message_update') {
       const event = record.assistantMessageEvent;
@@ -52,7 +58,7 @@ export async function connect(child, context) {
       if (!assistant) throw fail('RESULT_UNAVAILABLE', 'Pi settled without an assistant response for this job');
       const stats = await command('get_session_stats');
       const stop = assistant?.stopReason;
-      if (stop === 'error' || assistant?.errorMessage) throw fail('HARNESS_ERROR', assistant.errorMessage || 'Pi model error');
+      if (stop === 'error' || assistant?.errorMessage) throw fail('HARNESS_ERROR', assistant.errorMessage || 'Pi model error', { source: 'pi_assistant', native_stop_reason: stop || null, retry_policy: 'no_bridge_replay; abort_native_retry_backoff' });
       const text = typeof assistant?.content === 'string' ? assistant.content : (assistant?.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
       return { text, native_stop_reason: stop || null, native_cancelled: stop === 'aborted', usage: { scope: 'session', tokens: stats?.tokens ?? null, cost: stats?.cost ?? null }, evidence: 'agent_settled + idle get_state + current messages', session: { harness: 'pi', native_id: final?.sessionId, locator: { session_file: final?.sessionFile }, cwd: context.request.cwd } };
     },

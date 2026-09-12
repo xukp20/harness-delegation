@@ -20,6 +20,13 @@ function finish(cancelled = false) {
     emit({ jsonrpc: '2.0', method: '_x.ai/private', params: { safe: true } });
     acpReply({ id: promptId }, { stopReason: cancelled ? 'cancelled' : mode === 'error' ? 'refusal' : 'end_turn' });
   } else {
+    if (mode === 'retry') {
+      const message = { role: 'assistant', stopReason: 'error', errorMessage: 'Request timed out.', content: [] };
+      emit({ type: 'message_end', message });
+      emit({ type: 'auto_retry_start', attempt: 1, delayMs: 500, errorMessage: message.errorMessage });
+      timer = setTimeout(() => { emit({ type: 'fixture_unwanted_retry' }); process.exit(25); }, 500);
+      return;
+    }
     if (mode !== 'empty') messages.push({ role: 'assistant', stopReason: mode === 'error' ? 'error' : cancelled ? 'aborted' : 'stop', content: [{ type: 'text', text: 'FAKE_PI_DONE' }], ...(mode === 'error' ? { errorMessage: 'fixture model failure' } : {}) });
     emit({ type: 'agent_settled' });
   }
@@ -29,11 +36,24 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   const r = JSON.parse(line);
   if (grok) {
     if (r.method === 'initialize') acpReply(r, { protocolVersion: 1, agentCapabilities: { loadSession: mode !== 'no-resume' }, _meta: { agentVersion: '1.0.30' } });
-    else if (r.method === 'session/new') { emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'grok-session', update: { sessionUpdate: 'available_commands_update', _meta: { tools: ['read_file', 'list_dir', 'grep'] } } } }); acpReply(r, { sessionId: 'grok-session' }); }
+    else if (r.method === 'session/new') {
+      const update = () => emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'grok-session', update: { sessionUpdate: 'available_commands_update', _meta: { tools: ['read_file', 'list_dir', 'grep'] } } } });
+      if (mode === 'delayed-tools') setTimeout(update, 300);
+      else if (mode !== 'missing-tools-update') update();
+      acpReply(r, { sessionId: 'grok-session' });
+    }
+    else if (r.method === '_x.ai/commands/list') {
+      // Independent live-session pull: the notification above can be absent,
+      // late, or even claim the expected tools while this catalog disagrees.
+      if (r.params.sessionId !== 'grok-session') process.exit(24);
+      const tools = mode === 'wrong-tools' ? ['read_file', 'list_dir', 'grep', 'run_terminal_cmd'] : mode === 'missing-tool' ? ['read_file', 'grep'] : mode === 'duplicate-tools' ? ['read_file', 'list_dir', 'grep', 'grep'] : ['read_file', 'list_dir', 'grep'];
+      acpReply(r, { commands: [], ...(mode === 'no-tools-catalog' ? {} : { tools }) });
+    }
     else if (r.method === 'session/load') {
       emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'grok-session', update: { sessionUpdate: 'available_commands_update', _meta: { tools: ['read_file', 'list_dir', 'grep'] } } } });
       emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'grok-session', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'HISTORICAL_WRONG' } } } }); acpReply(r);
     } else if (r.method === 'session/prompt') {
+      emit({ jsonrpc: '2.0', method: '_fixture/prompt_received', params: { sessionId: r.params.sessionId } });
       promptId = r.id;
       if (mode === 'permission') emit({ jsonrpc: '2.0', id: 'permission', method: 'session/request_permission', params: { sessionId: 'grok-session', toolCall: { kind: 'execute' }, options: [{ kind: 'allow_once', optionId: 'yes' }, { kind: 'reject_once', optionId: 'no' }] } });
       timer = setTimeout(() => finish(), delay);
@@ -45,6 +65,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     else if (r.type === 'get_session_stats') piReply(r, { tokens: { input: 10, output: 2 }, cost: 0 });
     else if (r.type === 'prompt') { piReply(r); messages.push({ role: 'user', content: r.message }); if (mode === 'flood') { process.stderr.write('x'.repeat(20000)); for (let i = 0; i < 500; i++) emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'x'.repeat(500) } }); } timer = setTimeout(() => finish(), delay); }
     else if (r.type === 'abort') { piReply(r); if (mode !== 'ignore') { clearTimeout(timer); finish(true); } }
+    else if (r.type === 'abort_retry') { clearTimeout(timer); piReply(r); emit({ type: 'auto_retry_end', success: false }); emit({ type: 'agent_settled' }); }
     else piReply(r);
   }
 });

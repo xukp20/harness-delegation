@@ -42,7 +42,7 @@ export function prepare(request, cfg, dir) {
 }
 export async function connect(child, context) {
   const wire = new Wire(child, record => context.native(record), chunk => context.stderr(chunk));
-  let sessionId; let text = ''; let usage = null; let textTruncated = false; let observedTools;
+  let sessionId; let text = ''; let usage = null; let textTruncated = false;
   const request = async (method, params, timeout) => {
     const response = await wire.request({ jsonrpc: '2.0', method, params }, timeout);
     if (response.error) throw fail('HARNESS_ERROR', response.error.message || `Grok ${method} failed`);
@@ -50,7 +50,6 @@ export async function connect(child, context) {
     return response.result;
   };
   wire.on('record', record => {
-    if (record.method === 'session/update' && Array.isArray(record.params?.update?._meta?.tools)) observedTools = record.params.update._meta.tools;
     if (record.method && record.id !== undefined) {
       if (record.method === 'session/request_permission') {
         const options = record.params?.options || [];
@@ -86,7 +85,13 @@ export async function connect(child, context) {
     await request('session/load', { ...params, sessionId });
   } else sessionId = (await request('session/new', params)).sessionId;
   if (typeof sessionId !== 'string' || !sessionId) throw fail('PROTOCOL_ERROR', 'Grok did not return a session ID');
-  if (context.tools && (!observedTools || observedTools.some(t => !context.tools.includes(t)) || context.tools.some(t => !observedTools.includes(t)))) throw fail('TOOL_PROFILE_MISMATCH', 'Grok did not report the exact configured tools');
+  // Grok's unsolicited available_commands_update is not a session-ready
+  // barrier. Pull the live session's registered tools instead. This is a
+  // validated Grok 1.0.30 extension, NOT a standard ACP method or a model turn.
+  const catalog = await request('_x.ai/commands/list', { sessionId });
+  const observedTools = catalog?.tools;
+  if (!Array.isArray(observedTools) || observedTools.some(t => typeof t !== 'string') || !context.tools || observedTools.length !== new Set(observedTools).size || observedTools.some(t => !context.tools.includes(t)) || context.tools.some(t => !observedTools.includes(t))) throw fail('TOOL_PROFILE_MISMATCH', 'Grok did not report the exact configured tools', { source: '_x.ai/commands/list', session_id: sessionId, expected: context.tools, observed: Array.isArray(observedTools) ? observedTools : null });
+  context.event('tools.verified', { source: '_x.ai/commands/list', session_id: sessionId, tools: observedTools });
   const session = { harness: 'grok', native_id: sessionId, locator: { grok_home: context.native_home }, cwd: context.request.cwd };
   context.session(session);
   // Ignore historical updates replayed by session/load.

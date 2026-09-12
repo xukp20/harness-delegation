@@ -67,6 +67,14 @@ test('core, adapters, persistence and compatibility', async t => {
   await t.test('deadline escalates uncooperative process', async () => {
     configure('ignore', '60000'); const { job_id } = await jobs.start(request('pi', { timeout_seconds: 0.15 })); const s = await done(job_id); assert.equal(s.status, 'timed_out'); assert.equal(s.cleanup.stopped, true); assert.equal(alive(s.child), false);
   });
+  await t.test('Pi native retry backoff is aborted without changing settings or replaying prompt', async () => {
+    configure('retry'); const { job_id } = await jobs.start(request()); const s = await done(job_id);
+    assert.equal(s.status, 'failed'); assert.equal(s.error.message, 'Request timed out.');
+    assert.equal(s.error.details.source, 'pi_assistant'); assert.equal(s.cleanup.stopped, true);
+    const native = fs.readFileSync(path.join(directory(job_id), 'native.jsonl'), 'utf8');
+    assert.ok(native.includes('abort_retry')); assert.ok(!native.includes('set_auto_retry')); assert.ok(!native.includes('fixture_unwanted_retry'));
+    assert.equal(native.split('"command":"prompt"').length - 1, 1);
+  });
   await t.test('malformed wire, process exit, native error and historical result', async () => {
     for (const mode of ['malformed', 'crash', 'error', 'empty']) {
       configure(mode); const { job_id } = await jobs.start(request()); const s = await done(job_id);
