@@ -89,6 +89,8 @@ Tool restrictions and prompts are **not an OS sandbox**. Pi has no built-in perm
 
 Grok uses a small generated tool profile and a private native Home with an auth-file symlink to the configured original store. It disables auto-update, leader sharing, skill discovery, default tool injection and native subagent tools. Unsupported executable project configuration fails closed; arbitrary native MCP/plugin inheritance is outside v1. Native auth refresh may update the harness's own files. No credential values are copied into launch requests or returned as job metadata.
 
+Project checks cover canonical cwd through its verified Git worktree root, inclusive. User configuration outside that boundary is not mistaken for project configuration: ordinary repos under your home directory work with the isolated native Home. Project symlinks to user configuration are still rejected. When a worktree boundary cannot be reliably resolved, the bridge conservatively checks all ancestors; non-Git directories may therefore still be rejected. See [configuration discovery](docs/troubleshooting.md#project-configuration-and-worktree-boundaries).
+
 Only finite base environment names and explicit local `allow_env` names are forwarded; loader injection variables remain blocked. Logs are private and bounded, with known environment-secret redaction. Native output may itself contain sensitive material: do not publish raw runtime directories.
 
 Ordinary CLI exit/MCP reconnect can preserve work. Host reboot, logout cleanup, cgroup termination, and live supervisor replacement are not continuation guarantees. Lost work is never silently replayed. Session resume restores conversation, not workspace files.

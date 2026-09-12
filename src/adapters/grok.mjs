@@ -1,11 +1,32 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { Wire } from '../wire.mjs';
-import { fail, rootDir, digest } from '../common.mjs';
+import { fail, rootDir, digest, safeEnvironment } from '../common.mjs';
 
 export const capabilities = { start: true, cancel: true, resume: true, steer: false, follow_up: false, interaction: false };
 const READ_TOOLS = ['read_file', 'list_dir', 'grep'];
+function projectAncestors(cwd) {
+  const canonical = fs.realpathSync(cwd);
+  // Grok discovers project config only through the enclosing worktree. Resolve
+  // it independently of caller GIT_* overrides, and never exempt auth-home
+  // paths: a project symlink to user config is still project configuration.
+  const git = spawnSync('git', ['-C', canonical, 'rev-parse', '--show-toplevel'], { env: safeEnvironment(), encoding: 'utf8', timeout: 5000, maxBuffer: 65536 });
+  let root;
+  if (git.status === 0) {
+    try {
+      const candidate = fs.realpathSync(git.stdout.trim());
+      const relative = path.relative(candidate, canonical);
+      if (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`)) root = candidate;
+    } catch { /* Uncertain discovery retains the conservative full walk. */ }
+  }
+  const dirs = [];
+  for (let dir = canonical; ; dir = path.dirname(dir)) {
+    dirs.push(dir);
+    if (dir === root || path.dirname(dir) === dir) return dirs;
+  }
+}
 export function prepare(request, cfg, dir) {
   // Native authentication stays in its original store. The link is a reference,
   // not a copy; no credential is read or placed in the launch request.
@@ -21,11 +42,13 @@ export function prepare(request, cfg, dir) {
   const isolatedHome = path.join(rootDir(), 'native', 'home');
   fs.mkdirSync(isolatedHome, { recursive: true, mode: 0o700 });
   // Native project configuration can launch hooks/MCP before a model turn.
-  for (let cwd = request.cwd; ; cwd = path.dirname(cwd)) {
-    for (const name of ['.grok/config.toml', '.grok/hooks', '.grok/plugins', '.mcp.json', '.claude/settings.json', '.claude/settings.local.json', '.cursor/mcp.json']) {
-      if (fs.existsSync(path.join(cwd, name))) throw fail('PROJECT_CONFIG_UNSUPPORTED', `Grok v1 requires a workspace without executable native configuration: ${path.join(cwd, name)}`);
+  for (const cwd of projectAncestors(request.cwd)) {
+    for (const name of ['.grok/config.toml', '.grok/hooks', '.grok/plugins', '.grok/lsp.json', '.mcp.json', '.claude/settings.json', '.claude/settings.local.json', '.claude/plugins', '.cursor/mcp.json', '.cursor/hooks.json', '.envrc']) {
+      // lstat also rejects dangling configuration symlinks, not only targets
+      // which happen to exist at the time of validation.
+      try { fs.lstatSync(path.join(cwd, name)); } catch (e) { if (e.code === 'ENOENT') continue; throw e; }
+      throw fail('PROJECT_CONFIG_UNSUPPORTED', `Grok v1 requires a workspace without executable native configuration: ${path.join(cwd, name)}`);
     }
-    if (path.dirname(cwd) === cwd) break;
   }
   const tools = request.harness_options.tools ?? (request.role === 'worker' ? [...READ_TOOLS, 'run_terminal_cmd', 'search_replace'] : READ_TOOLS);
   if (!tools.length) throw fail('UNSUPPORTED_CAPABILITY', 'Grok 1.0.30 rejects an empty curated toolset; use the read-only tools profile');

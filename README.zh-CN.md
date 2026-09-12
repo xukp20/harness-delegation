@@ -69,6 +69,7 @@ MCP 工具为 `harness_list`、`task_start`、`task_list`、`task_get`、`task_r
 - 工具列表和提示词不是 OS sandbox（操作系统沙箱）；Pi 没有内置权限系统。工具继承启动用户的实际权限。
 - scope、Git 前后快照和 bridge 锁不能约束其他程序，也不能替代独立审查与测试。并发写入者使用独立 worktree。
 - Grok 使用明确的精简工具 profile 和私有 native Home，通过符号链接引用原生认证文件；禁止默认工具注入、subagent、leader 和自动更新。存在不支持的可执行项目配置时明确拒绝。
+- 项目检查从 canonical cwd（真实路径）到已验证的 Git worktree root（工作树根目录），包含根目录；边界外的用户配置不再误判为项目配置，因此 home 下的普通仓库可正常使用。项目内指向用户配置的符号链接仍拒绝；无法可靠解析 worktree 边界时保留全祖先保守检查，非 Git 目录仍可能被拒绝。
 - session resume 只继续对话，不恢复工作区文件，不重放不确定的 native command。
 - 普通 CLI 返回和 MCP 重连与 job 生命周期分离；不承诺主机重启、logout/cgroup 清理后继续执行。supervisor 丢失时记录 `lost`，不假装成功。
 - 日志私有且有界，已知环境秘密会脱敏；模型/工具原始输出仍可能包含敏感信息，不应公开整个 runtime 目录。

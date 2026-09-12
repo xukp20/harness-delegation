@@ -26,6 +26,16 @@ Grok 1.0.30 does not reliably send `available_commands_update` before `session/n
 
 `TOOL_PROFILE_MISMATCH` includes the expected/observed lists and source. Missing tools are a failure, not permission to proceed. A failed extension request also prevents prompting. Version upgrades need new no-model and fixture verification.
 
+## Project configuration and worktree boundaries
+
+`PROJECT_CONFIG_UNSUPPORTED` is a pre-launch rejection, not a provider/authentication failure. The original guard walked to filesystem root and incorrectly rejected `/root/.grok/config.toml` for a repo rooted at `/root/code/harness-delegation`. Grok's native project-config/MCP/plugin discovery is bounded by the enclosing Git worktree; its user tier uses launch HOME/GROK_HOME, which the bridge already isolates.
+
+The bridge now resolves a canonical, enclosing worktree root with bounded `git rev-parse --show-toplevel`, without caller `GIT_*` overrides. It checks every directory from cwd through that root, including the root. No user-home string or configured auth-home identity is exempted; a project `.grok/config.toml` symlink to user configuration still fails. Linked worktrees with a `.git` file are supported. When Git resolution fails or produces an invalid boundary, all ancestors are checked conservatively rather than trusting an uncertain cutoff. Non-Git directories, ownership-rejected repositories or unavailable Git can therefore retain the older rejection behavior.
+
+The check also rejects Claude plugin directories, Cursor hook configuration, `.grok/lsp.json` and `.envrc`: these are native executable project sources, not harmless instructions. In particular, native workspace setup can start trusted project LSP processes before a prompt even when the curated tools exclude LSP tools. Dangling configuration links are rejected using `lstat`. Do not delete your user config or move a real task to `/tmp` to hide a project-config issue. Keep unsupported project execution disabled or use an appropriately isolated workspace. These checks govern launch-time cooperative behavior, not concurrent filesystem mutation or OS-level isolation.
+
+Source basis: Grok's [RepoDirChain](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-agent/src/repo.rs), [project config discovery](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-workspace/src/project_config.rs), and [folder-trust executable-source checks](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-workspace/src/folder_trust.rs). A no-model 1.0.30 experiment watched inert config files with `inotifywait`: worktree-local config files were opened; sentinel files above the worktree were not. These observations support the boundary but are not a claim that every native feature was exercised.
+
 ## Pi timeout provenance and retry policy
 
 There are three distinct waits:
