@@ -2,6 +2,8 @@
 
 ## Compact response verification — 2026-09-13
 
+Independent fresh Luna task validation confirmed the installed native MCP tools expose the new default/detail format, preserve historical Pi/Grok text across pagination and advance cursors on hidden-only pages. It also found handshake regressions because compact errors dropped `details.source`. The compact projection now retains only `details.source` and `details.native_stop_reason`, while omitting session IDs and bulk diagnostic payloads. Final focused `node --test tests/presentation.test.mjs tests/mcp.test.mjs tests/handshake.test.mjs` passed 11/11. Luna's earlier full run reported 46 passes and 5 failures (the handshake failures plus their parent); no claim of a passing final full suite is made.
+
 Public CLI/MCP queries now project compact state, aggregate adjacent progress text without rewriting, and expose raw diagnostics via `detail=true` / `--detail`. Persisted receipts remain intact. Matching MCP text and structured output are retained for compatibility; transport byte reduction is not a measured model-token reduction.
 
 Focused validation: `node --test tests/presentation.test.mjs tests/mcp.test.mjs tests/audit-regressions.test.mjs tests/integration.test.mjs` passed 27/27. After adding CLI parity checks and preserving CLI help through projection, `node --test tests/mcp.test.mjs` passed again. Syntax checks, Skill validation and diff whitespace checks passed. Coverage includes exact Unicode/code text aggregation, message/tool/truncation boundaries, empty visible pages, raw pagination, error/cleanup visibility, detailed queries, and the affected lifecycle integration cases. The full suite was not rerun.

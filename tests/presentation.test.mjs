@@ -18,6 +18,8 @@ test('public states preserve failure, cleanup and truncation without process det
   assert.equal('supervisor' in out, false);
   assert.equal('session' in out, false);
   assert.equal(present('task_get', state, { detail: true }), state);
+  state.error.details = { source: '_x.ai/commands/list', native_stop_reason: 'refusal', session_id: 'private', expected: ['read'], pid: 1 };
+  assert.deepEqual(present('task_get', state).error.details, { source: '_x.ai/commands/list', native_stop_reason: 'refusal' });
   assert.equal('events' in present('task_wait', { state, events: ['old'], terminal: true }), false);
 });
 

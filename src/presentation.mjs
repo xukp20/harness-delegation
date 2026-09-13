@@ -4,7 +4,11 @@ function pick(value, keys) {
 }
 function stateView(value) {
   const out = pick(value, ['job_id', 'status', 'harness', 'execution_may_continue', 'final_text']);
-  if (value.error) out.error = pick(value.error, ['code', 'message']);
+  if (value.error) {
+    out.error = pick(value.error, ['code', 'message']);
+    const details = pick(value.error.details || {}, ['source', 'native_stop_reason']);
+    if (Object.keys(details).length) out.error.details = details;
+  }
   if (value.cleanup) out.cleanup = pick(value.cleanup, ['stopped', 'error']);
   if (value.text_truncated || value.final_text_truncated) out.final_text_truncated = true;
   if (Object.values(value.log_truncated || {}).some(Boolean)) out.log_truncated = true;
