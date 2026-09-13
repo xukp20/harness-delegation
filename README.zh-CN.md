@@ -6,6 +6,8 @@
 
 项目从 **Pi Agent Delegation** 演进而来，不依赖 ARK、CodexHost、app-server 代理、Desktop 注入或专用 UI。
 
+CLI/MCP 默认精简返回：等待只返回状态，`task_read` 无损合并相邻文本片段，最终正文通过 `task_get(result=true)` 获取。查询时用 `detail=true`（CLI `--detail`）查看完整诊断；原始证据仍保留在磁盘。读取后使用 `next_cursor` 继续，即使可见事件为空也应推进；`has_more` 表示还有已保存事件。错误、清理不确定性及截断信息不会隐藏。详见[协议说明](docs/protocol.md#operations)。
+
 ## 安装与配置
 
 当前支持 **Linux、Node.js 22+**；恢复判断依赖 Linux `/proc`，本版不支持 macOS / Windows。先单独安装 Pi / Grok 并完成原生认证。

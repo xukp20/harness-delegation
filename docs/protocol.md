@@ -10,6 +10,14 @@ Failures use `{"api_version":1,"ok":false,"error":{"code":"INVALID_REQUEST","mes
 
 ## Operations
 
+CLI and MCP responses are compact by default. `detail=true` (CLI `--detail`) on queries returns full diagnostic state/raw events. Start/resume omit local storage paths; state queries omit process identities, native session locators, Git snapshots, usage and other internal evidence. Errors, cleanup status, possible continued execution and truncation remain visible. `result=true` still returns the original bounded final text, not an AI summary. Persisted files and internal lifecycle state are unchanged.
+
+`task_wait` returns compact state and wait outcome only, including when `after` wakes it on new events; it does not consume a read cursor. Use `task_read(after=...)` for progress and advance only to its `next_cursor`. Detailed wait retains the previous state-plus-events response. `task_read` merges consecutive text deltas into `type:"text"` blocks without inserting whitespace. A block's `seq` is its last raw sequence number. Message/block boundaries reported by Pi, non-text Grok updates (except usage), tools and other events stop merging. Grok does not provide a universal message ID; only observable protocol boundaries can be respected. Historical logs cannot recover boundaries that were never recorded.
+
+Reads scan at most `limit` raw events (default 100, maximum 200) / 64 KiB before projection. Internal startup/verification/boundary events are hidden, but still advance `next_cursor`; an empty visible page can therefore advance. `has_more` indicates unread persisted events at read time, not whether the running job will produce more. Merging is page-local; concatenating pages preserves text without a server-side per-client buffer. Oversized-event previews and log/result truncation remain explicit.
+
+The MCP response retains matching text and `structuredContent` for client compatibility; both contain the compact projection. Do not assume the transport duplication necessarily doubles a client's model context. Consumers requiring the previous detailed shape should opt into detail mode; the envelope version and persisted schema remain unchanged.
+
 | MCP | CLI | Behavior |
 | --- | --- | --- |
 | `harness_list` | `harnesses`, `doctor [--harness pi|grok]` | Binary/version and declared capabilities; no prompt/authentication proof |

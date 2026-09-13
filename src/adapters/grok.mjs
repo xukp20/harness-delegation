@@ -94,9 +94,10 @@ export async function connect(child, context) {
     if (update?.sessionUpdate === 'agent_message_chunk' && update.content?.type === 'text') {
       text += update.content.text;
       if (Buffer.byteLength(text) > 1024 * 1024) { textTruncated = true; text = text.slice(-512 * 1024); }
-      context.event('text.delta', { text: update.content.text.slice(0, 8192) });
+      context.event('text.delta', { text: update.content.text });
     } else if (update?.sessionUpdate === 'usage_update') usage = update;
     else if (update?.sessionUpdate === 'tool_call') context.event('tool.started', { name: update.title, native_id: update.toolCallId });
+    else if (update) context.event('text.boundary');
   });
   const init = await request('initialize', { protocolVersion: 1, clientCapabilities: {}, clientInfo: { name: 'harness-delegation', version: '0.2.0' } });
   if (init.protocolVersion !== 1) throw fail('UNSUPPORTED_PROTOCOL', 'Grok must negotiate ACP v1');

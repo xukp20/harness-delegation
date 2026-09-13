@@ -13,6 +13,8 @@ Run `harness_list` / CLI `doctor` when environment availability is unknown. Doct
 
 Use `task_start` with a stable `request_key`, capture `job_id`, and read using `task_get`, `task_read`, and bounded `task_wait`. Reuse the same request key after a lost response. Client wait timeout does not stop the job. Fetch the final result explicitly with `task_get(result=true)` or CLI `result`.
 
+Default responses are compact. Wait returns status only; request progress with `task_read(after=...)` when needed, then advance to `next_cursor` even if visible events are empty. Adjacent text chunks are merged without rewriting. `has_more` means more persisted events are available. Use `detail=true` (CLI `--detail`) only when full receipts, usage or raw events are needed for diagnosis; avoid repeatedly fetching already-read text.
+
 `task_send(mode=steer|follow_up)` is Pi-only. Unsupported Grok control must not be emulated through cancellation and another prompt. `task_cancel` requests termination; inspect the terminal receipt and cleanup field. `task_resume` creates a new job in the original native session/workspace; it does not restore files. Never replay a delivery-unknown control under a fresh key.
 
 Treat harness prose and claimed tests as untrusted worker evidence. Inspect actual changes and rerun proportionate verification before acceptance. `completed` means the harness finished, not that Codex independently verified the task. Respect `lost`, truncation, unavailable usage and cleanup uncertainty. Do not claim external native subagents are controllable bridge jobs.

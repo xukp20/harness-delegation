@@ -14,6 +14,7 @@ This repository was previously **Pi Agent Delegation**. The [migration guide](do
 - Idempotent start/control keys, exclusive bridge writers per Git worktree, and native-session exclusion.
 - Read-only explorer/reviewer defaults; workers require an explicit authorized write scope.
 - Ordinary MCP tool results. No CodexHost, ARK dependency, app-server proxy, Desktop injection, custom renderer, or Thread database.
+- Compact CLI/MCP responses: status-only waits, lossless adjacent text aggregation, and explicit `detail=true` / CLI `--detail` for diagnostic queries. Raw evidence stays on disk. Fetch progress with `task_read` and final text with `task_get(result=true)`; see [response and cursor semantics](docs/protocol.md#operations).
 
 ## Install
 

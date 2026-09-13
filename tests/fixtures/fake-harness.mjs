@@ -28,6 +28,11 @@ function finish(cancelled = false) {
       return;
     }
     if (mode !== 'empty') messages.push({ role: 'assistant', stopReason: mode === 'error' ? 'error' : cancelled ? 'aborted' : 'stop', content: [{ type: 'text', text: 'FAKE_PI_DONE' }], ...(mode === 'error' ? { errorMessage: 'fixture model failure' } : {}) });
+    if (mode === 'normal' && !cancelled) {
+      emit({ type: 'message_start', message: { role: 'assistant' } });
+      for (const delta of ['FAKE_', 'PI_', 'DONE']) emit({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta } });
+      emit({ type: 'message_end', message: messages.at(-1) });
+    }
     emit({ type: 'agent_settled' });
   }
 }

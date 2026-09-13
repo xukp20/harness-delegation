@@ -98,12 +98,12 @@ export async function list({ cwd, limit = 50 } = {}) {
   return transaction(() => ids().reverse().map(reconcile).filter(s => !cwd || s.cwd === fs.realpathSync(cwd)).slice(0, limit));
 }
 export async function read(id, options = {}) { const state = await get(id); return { job_id: id, status: state.status, terminal: terminal(state.status), ...readEvents(id, options.after, options.limit), truncated: state.log_truncated || {} }; }
-export async function wait(id, { after, timeout_seconds = 30 } = {}) {
+export async function wait(id, { after, timeout_seconds = 30, include_events = true } = {}) {
   if (!Number.isFinite(timeout_seconds) || timeout_seconds < 0 || timeout_seconds > 45) throw fail('INVALID_REQUEST', 'wait timeout_seconds must be 0..45');
   const end = Date.now() + timeout_seconds * 1000;
   while (true) {
     const state = await get(id); const events = readEvents(id, after ?? 0);
-    if (terminal(state.status) || (after !== undefined && events.events.length) || Date.now() >= end) return { state, ...events, terminal: terminal(state.status), timed_out: !terminal(state.status) && Date.now() >= end };
+    if (terminal(state.status) || (after !== undefined && events.events.length) || Date.now() >= end) return { state, ...(include_events ? events : {}), terminal: terminal(state.status), timed_out: !terminal(state.status) && Date.now() >= end };
     await sleep(100);
   }
 }

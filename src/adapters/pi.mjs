@@ -30,6 +30,7 @@ export async function connect(child, context) {
   settled.catch(() => {});
   wire.on('closed', rejectSettled);
   wire.on('record', record => {
+    if (['message_start', 'message_end'].includes(record.type)) context.event('text.boundary');
     if (active && record.type === 'message_end' && record.message?.role === 'assistant') currentAssistant = record.message;
     if (active && record.type === 'auto_retry_start') {
       // Cancel Pi's pending backoff, never replay an ambiguous model request.
@@ -40,7 +41,8 @@ export async function connect(child, context) {
     if (active && record.type === 'agent_settled') { context.settling?.(); resolveSettled(); }
     if (record.type === 'message_update') {
       const event = record.assistantMessageEvent;
-      if (event?.type === 'text_delta') context.event('text.delta', { text: event.delta?.slice(0, 8192) });
+      if (event?.type === 'text_delta') context.event('text.delta', { text: event.delta });
+      else if (event?.type === 'text_start' || event?.type === 'text_end') context.event('text.boundary');
     }
     if (record.type === 'tool_execution_start') context.event('tool.started', { name: record.toolName, native_id: record.toolCallId });
   });

@@ -64,7 +64,7 @@ export class Journal {
 }
 export function readEvents(id, after = 0, limit = 100) {
   if (!Number.isSafeInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw fail('INVALID_REQUEST', 'after must be nonnegative; limit must be 1..200');
-  const file = path.join(directory(id), 'events.jsonl'); const events = []; let bytes = 0;
+  const file = path.join(directory(id), 'events.jsonl'); const events = []; let bytes = 0; let hasMore = false;
   if (fs.existsSync(file)) {
     const lines = fs.readFileSync(file, 'utf8').split('\n');
     for (const line of lines) {
@@ -73,9 +73,9 @@ export function readEvents(id, after = 0, limit = 100) {
       if (item.seq <= after) continue;
       if (Buffer.byteLength(line) > 16384) item = { seq: item.seq, at: item.at, type: item.type, data: { truncated: true, preview: line.slice(0, 2048) } };
       const size = Buffer.byteLength(JSON.stringify(item));
-      if (events.length >= limit || bytes + size > 65536) break;
+      if (events.length >= limit || bytes + size > 65536) { hasMore = true; break; }
       events.push(item); bytes += size;
     }
   }
-  return { events, next_cursor: events.at(-1)?.seq ?? after };
+  return { events, next_cursor: events.at(-1)?.seq ?? after, has_more: hasMore };
 }

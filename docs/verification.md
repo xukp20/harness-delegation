@@ -1,5 +1,15 @@
 # Verification evidence
 
+## Compact response verification — 2026-09-13
+
+Public CLI/MCP queries now project compact state, aggregate adjacent progress text without rewriting, and expose raw diagnostics via `detail=true` / `--detail`. Persisted receipts remain intact. Matching MCP text and structured output are retained for compatibility; transport byte reduction is not a measured model-token reduction.
+
+Focused validation: `node --test tests/presentation.test.mjs tests/mcp.test.mjs tests/audit-regressions.test.mjs tests/integration.test.mjs` passed 27/27. After adding CLI parity checks and preserving CLI help through projection, `node --test tests/mcp.test.mjs` passed again. Syntax checks, Skill validation and diff whitespace checks passed. Coverage includes exact Unicode/code text aggregation, message/tool/truncation boundaries, empty visible pages, raw pagination, error/cleanup visibility, detailed queries, and the affected lifecycle integration cases. The full suite was not rerun.
+
+Historical real-job replay: Pi `job_947f6045-28e3-4adc-8ab0-8438e11d84fe` merged five text deltas into one block; Grok `job_d6ba225f-504c-48c3-b023-7998debca44d` merged nine into one. Both matched their saved final text exactly. JSON data bytes (excluding the common envelope): Pi result 1843 → 179, read 720 → 238; Grok result 2228 → 183, read 1248 → 243. These are short canaries, not a claim of equivalent savings for long prose.
+
+New live read-only calls used the configured providers in the actual repository, requesting a README read and longer text including Chinese and fenced JSON. Pi `job_deb9ad0c-dccf-4ced-8374-a5805dd1bdf4` failed before inference: its existing local BeeAPI credential helper still reads the main Codex config, whose BeeAPI block had been moved to dormant private storage. Grok `job_6149bfcf-8337-405c-9099-2f8ae328db28` passed initialization/exact tool verification but produced no text or tool call before its 120-second deadline. Both confirmed stopped cleanup. No provider switch, credential change or automatic paid retry was performed. Live long-text/tool-interleaving success remains unverified; historical replay and fixture coverage do not substitute for that result.
+
 Implementation baseline: original commit `9a12b75f6717bdfe58529f23c4b10dd77a848260`, whose six tests passed before refactoring. The v0.2 suite replaces those tests with core/adapter/CLI/MCP integration cases using fake subprocesses. No model calls are part of `npm test`.
 
 Environment: Linux, Node 24.21.0. Tested binaries: Pi 0.80.10 and Grok Build 1.0.30 (`04b7ffed98c6`). Earlier v0.1 documentation mentioned Pi 0.82.0; that is historical evidence, not a claim that v0.2 was tested against that installation. Grok initialization rejects versions other than 1.0.30 until explicitly validated.
