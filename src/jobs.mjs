@@ -29,7 +29,7 @@ export function validate(input) {
   if (typeof options !== 'object' || Array.isArray(options)) throw fail('INVALID_REQUEST', 'harness_options must be an object');
   for (const [key, value] of Object.entries(options)) {
     if (!['model', 'provider', 'thinking', 'tools'].includes(key)) throw fail('INVALID_REQUEST', `Unsupported harness option: ${key}`);
-    if (key === 'provider' && input.harness !== 'pi') throw fail('INVALID_REQUEST', 'provider is Pi-specific');
+    if (key === 'provider' && input.harness !== 'pi' && input.harness !== 'dsh') throw fail('INVALID_REQUEST', 'provider is Pi-specific');
     if (key === 'tools' ? !stringList(value) : typeof value !== 'string' || value.length > 200 || value.startsWith('-')) throw fail('INVALID_REQUEST', `Invalid harness option: ${key}`);
   }
   return { harness: input.harness, cwd: fs.realpathSync(input.cwd), role, task: input.task.trim(), write_scope: input.write_scope || [], no_touch_scope: input.no_touch_scope || [], acceptance: input.acceptance || [], timeout_seconds: timeout, harness_options: options, ...(input.request_key ? { request_key: input.request_key } : {}), ...(input.session ? { session: input.session } : {}), ...(input.resume_from_job_id ? { resume_from_job_id: input.resume_from_job_id } : {}) };
@@ -72,7 +72,7 @@ export async function start(input, { internal = false } = {}) {
     }
     const id = `job_${crypto.randomUUID()}`; const dir = directory(id);
     fs.mkdirSync(dir, { mode: 0o700 });
-    const profile = { binary: cfg.binary, allow_env: cfg.allow_env, ...(cfg.home ? { home: cfg.home } : {}), ...(cfg.model ? { model: cfg.model } : {}), ...(cfg.provider ? { provider: cfg.provider } : {}), ...(cfg.thinking ? { thinking: cfg.thinking } : {}), ...(cfg.log_bytes ? { log_bytes: cfg.log_bytes } : {}) };
+    const profile = { binary: cfg.binary, allow_env: cfg.allow_env, ...(cfg.home ? { home: cfg.home } : {}), ...(cfg.model ? { model: cfg.model } : {}), ...(cfg.provider ? { provider: cfg.provider } : {}), ...(cfg.base_url ? { base_url: cfg.base_url } : {}), ...(cfg.api_key_env ? { api_key_env: cfg.api_key_env } : {}), ...(cfg.thinking ? { thinking: cfg.thinking } : {}), ...(cfg.log_bytes ? { log_bytes: cfg.log_bytes } : {}) };
     const stored = { ...request, schema_version: 1, job_id: id, workspace, profile, request_digest: fingerprint, config_identity: configIdentity, created_at: now() };
     atomic(path.join(dir, 'request.json'), stored);
     atomic(path.join(dir, 'state.json'), { job_id: id, status: 'queued', created_at: stored.created_at });
@@ -148,4 +148,4 @@ export async function resume(id, input) {
   const { schema_version, job_id, workspace, profile, request_digest, config_identity, created_at, ...base } = original;
   return start({ ...base, ...input, harness: original.harness, cwd: original.cwd, session: previous.session, resume_from_job_id: id, request_key: input.request_key }, { internal: true });
 }
-export const harnessList = () => ['pi', 'grok'].map(doctor);
+export const harnessList = () => ['pi', 'grok', 'dsh'].map(doctor);

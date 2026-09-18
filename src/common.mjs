@@ -40,7 +40,7 @@ export function safeEnvironment(allow = [], env = process.env) {
 }
 export function harnessConfig(harness) {
   const cfg = config().harnesses?.[harness] || {};
-  return { ...cfg, binary: cfg.binary || (harness === 'pi' ? process.env.PI_AGENT_PI_BIN || 'pi' : 'grok'), allow_env: cfg.allow_env || [] };
+  return { ...cfg, binary: cfg.binary || (harness === 'pi' ? process.env.PI_AGENT_PI_BIN || 'pi' : harness === 'grok' ? 'grok' : 'dsh'), allow_env: cfg.allow_env || [] };
 }
 export function redact(value, env = process.env) {
   let text = typeof value === 'string' ? value : JSON.stringify(value);

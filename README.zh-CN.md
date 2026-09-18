@@ -2,9 +2,11 @@
 
 [English](README.md)
 
-通过原生 Codex Desktop / CLI 将边界明确的任务委派给 **Pi** 和 **Grok Build**。共享 job core（任务核心）提供 JSON CLI、STDIO MCP 和 Codex Skill；外部任务不会伪装成 Codex 原生 subagent，结果由 Codex 显式读取并独立验收。
+通过原生 Codex Desktop / CLI 将边界明确的任务委派给 **Pi**、**Grok Build** 和 **DSH**。共享 job core（任务核心）提供 JSON CLI、STDIO MCP 和 Codex Skill；外部任务不会伪装成 Codex 原生 subagent，结果由 Codex 显式读取并独立验收。
 
 项目从 **Pi Agent Delegation** 演进而来，不依赖 ARK、CodexHost、app-server 代理、Desktop 注入或专用 UI。
+
+既可直接使用，也可由 `directed-delegation` 的自定义 profile（执行配置）选中，再使用本工具执行外部任务。统一入口负责选择、简报与验收，本工具负责 Pi/Grok/DSH 的实际接口和恢复规则；原生 subagent 的 provider 路由不会修改外部 harness 的认证或模型。详见[命名配置接入](docs/named-profiles.md)。
 
 CLI/MCP 默认精简返回：等待只返回状态，`task_read` 无损合并相邻文本片段，最终正文通过 `task_get(result=true)` 获取。查询时用 `detail=true`（CLI `--detail`）查看完整诊断；原始证据仍保留在磁盘。读取后使用 `next_cursor` 继续，即使可见事件为空也应推进；`has_more` 表示还有已保存事件。错误、清理不确定性及截断信息不会隐藏。详见[协议说明](docs/protocol.md#operations)。
 
@@ -26,12 +28,13 @@ node bin/harness-delegate.mjs doctor
   "schema_version": 1,
   "harnesses": {
     "pi": {"binary": "/absolute/path/to/pi", "provider": "openai-codex", "model": "gpt-5.6-luna"},
-    "grok": {"binary": "/absolute/path/to/grok", "model": "grok-4.6"}
+    "grok": {"binary": "/absolute/path/to/grok", "model": "grok-4.6"},
+    "dsh": {"binary": "/absolute/path/to/dsh", "provider": "your-provider", "model": "your-model"}
   }
 }
 ```
 
-`allow_env` 只填写明确需要传递的环境变量名称，不能填写凭据值。默认状态目录是 `~/.local/state/harness-delegation`；`HARNESS_DELEGATION_DIR` 可覆盖。需要互相协调的 CLI / MCP 必须使用同一私有、本机状态目录。
+`allow_env` 只填写明确需要传递的环境变量名称，不能填写凭据值。第三方 provider 的名称、地址、模型和 key 环境变量都属于本机配置，adapter 不绑定具体供应商，也不会复制凭据值。默认状态目录是 `~/.local/state/harness-delegation`；`HARNESS_DELEGATION_DIR` 可覆盖。需要互相协调的 CLI / MCP 必须使用同一私有、本机状态目录。
 
 Skill 应从完整 checkout 链接：
 

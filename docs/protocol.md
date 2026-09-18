@@ -22,7 +22,7 @@ The MCP response retains matching text and `structuredContent` for client compat
 
 | MCP | CLI | Behavior |
 | --- | --- | --- |
-| `harness_list` | `harnesses`, `doctor [--harness pi|grok]` | Binary/version and declared capabilities; no prompt/authentication proof |
+| `harness_list` | `harnesses`, `doctor [--harness pi|grok|dsh]` | Binary/version and declared capabilities; no prompt/authentication proof |
 | `task_start` | `start`, `run` | Start detached job; `run` additionally waits |
 | `task_list` | `list [--cwd PATH] [--limit N]` | Up to 200 bridge jobs |
 | `task_get` | `get`, `status`, `result` | State; `result=true` or `result` includes bounded final text |
@@ -32,7 +32,7 @@ The MCP response retains matching text and `structuredContent` for client compat
 | `task_cancel` | `cancel ID` | Request stop; final receipt confirms cleanup |
 | `task_resume` | `resume ID --task TEXT` | New job continuing original native session/workspace |
 
-MCP start/send/cancel/resume require `request_key`. CLI accepts `--request-key`; omitted keys mean a new operation on each invocation. Pass tasks/messages with `--task-file`/`--message-file` or `--request-file` to avoid shell quoting hazards. Models, providers and thinking levels are strings passed to the appropriate harness; `provider` is Pi-specific. Arbitrary binary/argv fields are rejected.
+MCP start/send/cancel/resume require `request_key`. CLI accepts `--request-key`; omitted keys mean a new operation on each invocation. Pass tasks/messages with `--task-file`/`--message-file` or `--request-file` to avoid shell quoting hazards. Models, providers and thinking levels are strings passed to the appropriate harness. External-provider endpoints and credential environment names are local harness configuration, never request secrets. Arbitrary binary/argv fields are rejected.
 
 Example start request (`--request-file` contents or MCP arguments):
 

@@ -1,11 +1,15 @@
 ---
 name: harness-delegation
-description: Delegate explicitly authorized, bounded work from native Codex to external Pi or Grok coding harnesses; start, read, wait, cancel and resume persisted jobs. External jobs are not native Codex subagents.
+description: Execute authorized external Pi, Grok, or DSH jobs, directly or selected through directed-delegation; start, read, wait, cancel and resume persisted jobs. External jobs are not native Codex subagents.
 ---
 
 # Harness Delegation
 
 Use the installed MCP tools when available, otherwise run `node ../../bin/harness-delegate.mjs` from this Skill's directory in the complete checkout. Do not silently substitute external jobs for native subagents.
+
+`directed-delegation` is the optional common entry for selecting an executor, briefing it and accepting its output. This Skill owns only the external execution interface and its recovery limits; it also works directly without that companion. Explicit task authorization or an applicable user-enabled delegation policy can authorize external work. Respect that policy's allowed harnesses and user exceptions; a failed native provider does not authorize an external fallback. Native provider routing does not rewrite an external harness model, credentials or session.
+
+When the assignment selects a named external profile, resolve it using Directed's profile tool and use the returned harness/options with the existing `task_start` interface. Read [named profiles](../../docs/named-profiles.md) for this path. Do not register external profiles as native Codex roles or copy model-selection rules into this adapter Skill.
 
 Before delegating, establish the requested harness, absolute workspace, bounded task, write/no-touch scope, acceptance criteria, and focused verification. Default to reviewer/explorer. Worker requires implementation authorization and explicit `write_scope`; concurrent writers need separate worktrees. These declarations and tool lists are not OS isolation.
 

@@ -9,7 +9,7 @@ export const capabilities = { start: true, cancel: true, resume: true, steer: fa
 const READ_TOOLS = ['read_file', 'list_dir', 'grep'];
 function projectAncestors(cwd) {
   const canonical = fs.realpathSync(cwd);
-  // Grok discovers project config only through the enclosing worktree. Resolve
+  // DSH discovers project config only through the enclosing worktree. Resolve
   // it independently of caller GIT_* overrides, and never exempt auth-home
   // paths: a project symlink to user config is still project configuration.
   const git = spawnSync('git', ['-C', canonical, 'rev-parse', '--show-toplevel'], { env: safeEnvironment(), encoding: 'utf8', timeout: 5000, maxBuffer: 65536 });
@@ -30,23 +30,14 @@ function projectAncestors(cwd) {
 export function prepare(request, cfg, dir) {
   // Native authentication stays in its original store. The link is a reference,
   // not a copy; no credential is read or placed in the launch request.
-  const configuredHome = cfg.home || path.join(os.homedir(), '.grok');
+  const configuredHome = cfg.home || path.join(os.homedir(), '.dsh');
   const authHome = fs.existsSync(configuredHome) ? fs.realpathSync(configuredHome) : path.resolve(configuredHome);
-  const home = path.join(rootDir(), 'native', 'grok', digest(authHome).slice(0, 20));
+  const home = path.join(rootDir(), 'native', 'dsh', digest(authHome).slice(0, 20));
   fs.mkdirSync(home, { recursive: true, mode: 0o700 });
-  if (request.session && request.session.locator.grok_home !== home) throw fail('SESSION_MISMATCH', 'Grok session belongs to a different native Home');
-  const provider = request.harness_options.provider || cfg.provider || 'native';
-  const external = provider !== 'native';
+  if (request.session && request.session.locator.dsh_home !== home) throw fail('SESSION_MISMATCH', 'DSH session belongs to a different native Home');
   const auth = path.join(authHome, 'auth.json');
-  if (!external && fs.existsSync(auth) && !fs.existsSync(path.join(home, 'auth.json'))) {
+  if (fs.existsSync(auth) && !fs.existsSync(path.join(home, 'auth.json'))) {
     try { fs.symlinkSync(auth, path.join(home, 'auth.json')); } catch (e) { if (e.code !== 'EEXIST') throw e; }
-  }
-  if (external) {
-    const model = request.harness_options.model || cfg.model || 'grok-4.6';
-    if (!cfg.base_url || !cfg.api_key_env) throw fail('CONFIG_ERROR', `External Grok provider ${provider} requires base_url and api_key_env`);
-    const baseUrl = cfg.base_url;
-    const envKey = cfg.api_key_env;
-    fs.writeFileSync(path.join(home, 'config.toml'), `[model."${model}"]\nbase_url = "${baseUrl}"\nenv_key = "${envKey}"\napi_backend = "chat_completions"\n`, { mode: 0o600 });
   }
   const isolatedHome = path.join(rootDir(), 'native', 'home');
   fs.mkdirSync(isolatedHome, { recursive: true, mode: 0o700 });
@@ -56,31 +47,26 @@ export function prepare(request, cfg, dir) {
       // lstat also rejects dangling configuration symlinks, not only targets
       // which happen to exist at the time of validation.
       try { fs.lstatSync(path.join(cwd, name)); } catch (e) { if (e.code === 'ENOENT') continue; throw e; }
-      throw fail('PROJECT_CONFIG_UNSUPPORTED', `Grok v1 requires a workspace without executable native configuration: ${path.join(cwd, name)}`);
+      throw fail('PROJECT_CONFIG_UNSUPPORTED', `DSH v1 requires a workspace without executable native configuration: ${path.join(cwd, name)}`);
     }
   }
   const tools = request.harness_options.tools ?? (request.role === 'worker' ? [...READ_TOOLS, 'run_terminal_cmd', 'search_replace'] : READ_TOOLS);
-  if (!tools.length) throw fail('UNSUPPORTED_CAPABILITY', 'Grok 1.0.30 rejects an empty curated toolset; use the read-only tools profile');
+  if (!tools.length) throw fail('UNSUPPORTED_CAPABILITY', 'DSH 1.0.30 rejects an empty curated toolset; use the read-only tools profile');
   const allowed = request.role === 'worker' ? [...READ_TOOLS, 'run_terminal_cmd', 'search_replace'] : READ_TOOLS;
-  if (tools.some(t => !allowed.includes(t))) throw fail('PERMISSION_DENIED', 'Unsupported Grok tool for this role');
-  const profile = { name: 'harness-delegation', description: 'Bounded external task', discoverSkills: false, inheritSkills: false, agentsMd: true, injectDefaultTools: false, toolConfig: { tools: tools.map(id => ({ id: `GrokBuild:${id}` })) }, mcpInheritance: 'none', disallowedTools: ['Agent', 'Task', 'task', 'workflow', 'monitor', 'scheduler_create'], background: false };
-  const profilePath = path.join(dir, 'grok-profile.md');
+  if (tools.some(t => !allowed.includes(t))) throw fail('PERMISSION_DENIED', 'Unsupported DSH tool for this role');
+  const profile = { name: 'harness-delegation', description: 'Bounded external task', discoverSkills: false, inheritSkills: false, agentsMd: true, injectDefaultTools: false, toolConfig: { tools: tools.map(id => ({ id: `DSHBuild:${id}` })) }, mcpInheritance: 'none', disallowedTools: ['Agent', 'Task', 'task', 'workflow', 'monitor', 'scheduler_create'], background: false };
+  const profilePath = path.join(dir, 'dsh-profile.md');
   fs.writeFileSync(profilePath, `---\n${JSON.stringify(profile)}\n---\nWork only on the delegated task. Do not start background processes or subagents.\n`, { mode: 0o600 });
-  const args = ['agent', '--no-leader', '--agent-profile', profilePath];
-  if (request.harness_options.model || cfg.model) args.push('--model', request.harness_options.model || cfg.model);
-  if (request.harness_options.thinking || cfg.thinking) args.push('--reasoning-effort', request.harness_options.thinking || cfg.thinking);
-  args.push('stdio');
-  return { args, env: { HOME: isolatedHome, GROK_HOME: home, GROK_DISABLE_AUTOUPDATER: '1' }, native_home: home, tools };
+  const args = ['--profile', 'acp'];
+
+  return { args, env: { HOME: isolatedHome, DSH_HOME: home }, native_home: home, tools };
 }
 export async function connect(child, context) {
   const wire = new Wire(child, record => context.native(record), chunk => context.stderr(chunk));
   let sessionId; let text = ''; let usage = null; let textTruncated = false;
   const request = async (method, params, timeout) => {
     const response = await wire.request({ jsonrpc: '2.0', method, params }, timeout);
-    if (response.error) {
-      const detail = response.error.data?.message || response.error.data?.error_message;
-      throw fail('HARNESS_ERROR', detail ? `${response.error.message || `Grok ${method} failed`}: ${detail}` : (response.error.message || `Grok ${method} failed`), response.error.data);
-    }
+    if (response.error) throw fail('HARNESS_ERROR', response.error.message || `DSH ${method} failed`);
     if (!('result' in response)) throw fail('PROTOCOL_ERROR', `Missing ACP result: ${method}`);
     return response.result;
   };
@@ -112,32 +98,25 @@ export async function connect(child, context) {
     else if (update) context.event('text.boundary');
   });
   const init = await request('initialize', { protocolVersion: 1, clientCapabilities: {}, clientInfo: { name: 'harness-delegation', version: '0.2.0' } });
-  if (init.protocolVersion !== 1) throw fail('UNSUPPORTED_PROTOCOL', 'Grok must negotiate ACP v1');
-  if (init._meta?.agentVersion !== '1.0.30') throw fail('UNSUPPORTED_VERSION', 'Grok adapter requires validated version 1.0.30');
+  if (init.protocolVersion !== 1) throw fail('UNSUPPORTED_PROTOCOL', 'DSH must negotiate ACP v1');
+
   const params = { cwd: context.request.cwd, mcpServers: [] };
   if (context.request.session) {
-    if (!init.agentCapabilities?.loadSession) throw fail('UNSUPPORTED_CAPABILITY', 'Grok did not advertise session/load');
+    if (!init.agentCapabilities?.sessionCapabilities?.resume) throw fail('UNSUPPORTED_CAPABILITY', 'DSH did not advertise session/resume');
     sessionId = context.request.session.native_id;
-    await request('session/load', { ...params, sessionId });
+    await request('session/resume', { ...params, sessionId });
   } else sessionId = (await request('session/new', params)).sessionId;
-  if (typeof sessionId !== 'string' || !sessionId) throw fail('PROTOCOL_ERROR', 'Grok did not return a session ID');
-  // Grok's unsolicited available_commands_update is not a session-ready
-  // barrier. Pull the live session's registered tools instead. This is a
-  // validated Grok 1.0.30 extension, NOT a standard ACP method or a model turn.
-  const catalog = await request('_x.ai/commands/list', { sessionId });
-  const observedTools = catalog?.tools;
-  if (!Array.isArray(observedTools) || observedTools.some(t => typeof t !== 'string') || !context.tools || observedTools.length !== new Set(observedTools).size || observedTools.some(t => !context.tools.includes(t)) || context.tools.some(t => !observedTools.includes(t))) throw fail('TOOL_PROFILE_MISMATCH', 'Grok did not report the exact configured tools', { source: '_x.ai/commands/list', session_id: sessionId, expected: context.tools, observed: Array.isArray(observedTools) ? observedTools : null });
-  context.event('tools.verified', { source: '_x.ai/commands/list', session_id: sessionId, tools: observedTools });
-  const session = { harness: 'grok', native_id: sessionId, locator: { grok_home: context.native_home }, cwd: context.request.cwd };
+  if (typeof sessionId !== 'string' || !sessionId) throw fail('PROTOCOL_ERROR', 'DSH did not return a session ID');
+  const session = { harness: 'dsh', native_id: sessionId, locator: { dsh_home: context.native_home }, cwd: context.request.cwd };
   context.session(session);
   // Ignore historical updates replayed by session/load.
   text = ''; usage = null; textTruncated = false;
   return {
-    capabilities: { ...capabilities, resume: !!init.agentCapabilities?.loadSession },
+    capabilities: { ...capabilities, resume: !!init.agentCapabilities?.sessionCapabilities?.resume },
     async run(prompt) {
       const result = await request('session/prompt', { sessionId, prompt: [{ type: 'text', text: prompt }] }, (context.request.timeout_seconds + 20) * 1000);
       if (!['end_turn', 'cancelled', 'max_tokens', 'max_turn_requests', 'refusal'].includes(result.stopReason)) throw fail('PROTOCOL_ERROR', `Unknown ACP stopReason: ${result.stopReason}`);
-      if (result.stopReason !== 'end_turn' && result.stopReason !== 'cancelled') throw fail('HARNESS_STOPPED', `Grok stopped: ${result.stopReason}`);
+      if (result.stopReason !== 'end_turn' && result.stopReason !== 'cancelled') throw fail('HARNESS_STOPPED', `DSH stopped: ${result.stopReason}`);
       context.settling?.();
       return { text, text_truncated: textTruncated, session, model: result._meta?.modelId || null, native_stop_reason: result.stopReason, native_cancelled: result.stopReason === 'cancelled', usage: result._meta?.usage ? { scope: 'turn', source: 'x.ai prompt response metadata', native: result._meta.usage } : usage ? { scope: 'session', native: usage } : null, evidence: 'ACP session/prompt response; verified exact tool profile excludes native subagents' };
     },

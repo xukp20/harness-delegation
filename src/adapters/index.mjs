@@ -2,11 +2,13 @@ import { spawnSync } from 'node:child_process';
 import { harnessConfig, safeEnvironment, fail } from '../common.mjs';
 import * as pi from './pi.mjs';
 import * as grok from './grok.mjs';
+import * as dsh from './dsh.mjs';
 
 export function adapterFor(harness) {
   if (harness === 'pi') return pi;
   if (harness === 'grok') return grok;
-  throw fail('INVALID_REQUEST', 'harness must be pi or grok');
+  if (harness === 'dsh') return dsh;
+  throw fail('INVALID_REQUEST', 'harness must be pi, grok or dsh');
 }
 export function doctor(harness) {
   const adapter = adapterFor(harness); const cfg = harnessConfig(harness);

@@ -2,9 +2,11 @@
 
 [简体中文](README.zh-CN.md)
 
-Delegate bounded coding tasks from native Codex Desktop or CLI to **Pi** and **Grok Build**. A small shared job core powers a JSON CLI, a STDIO MCP server, and a Codex Skill. External jobs remain external: Codex retrieves their evidence and verifies their changes.
+Delegate bounded coding tasks from native Codex Desktop or CLI to **Pi**, **Grok Build**, and **DSH**. A small shared job core powers a JSON CLI, a STDIO MCP server, and a Codex Skill. External jobs remain external: Codex retrieves their evidence and verifies their changes.
 
 This repository was previously **Pi Agent Delegation**. The [migration guide](docs/migration.md) covers the old Skill, script, environment variables, and receipts.
+
+Use it directly, or as the external execution branch of `directed-delegation`, whose customizable profiles and task recommendations also cover native subagents. [Named profiles](docs/named-profiles.md) explains the optional integration. Provider-mode routing of native subagents does not change external harness authentication or model settings.
 
 ## What it provides
 
@@ -36,12 +38,13 @@ Configure binaries and defaults in `~/.config/harness-delegation/config.json`:
   "schema_version": 1,
   "harnesses": {
     "pi": {"binary": "/absolute/path/to/pi", "provider": "openai-codex", "model": "gpt-5.6-luna", "thinking": "high"},
-    "grok": {"binary": "/absolute/path/to/grok", "model": "grok-4.6", "thinking": "low"}
+    "grok": {"binary": "/absolute/path/to/grok", "model": "grok-4.6", "thinking": "low"},
+    "dsh": {"binary": "/absolute/path/to/dsh", "provider": "your-provider", "model": "your-model"}
   }
 }
 ```
 
-Optional local keys: `state_dir`; harness `allow_env` (names only), `log_bytes` (1 KiB–16 MiB), and Grok `home` (existing native auth home). Override the config path with `HARNESS_DELEGATION_CONFIG`; state defaults to `~/.local/state/harness-delegation` and can be overridden with `HARNESS_DELEGATION_DIR`. Use one private local state root across CLI/MCP clients that must coordinate.
+Optional local keys: `state_dir`; harness `allow_env` (names only), `log_bytes` (1 KiB–16 MiB), native `home`, and external-provider `base_url` plus `api_key_env`. Provider names, endpoints, models, and credential variable names are configuration values; adapters do not select a vendor or copy credential values. Override the config path with `HARNESS_DELEGATION_CONFIG`; state defaults to `~/.local/state/harness-delegation` and can be overridden with `HARNESS_DELEGATION_DIR`. Use one private local state root across CLI/MCP clients that must coordinate.
 
 `doctor` checks executable/version availability; it does **not** prove credentials are valid or send a model prompt. Version targets and real verification evidence are in [verification](docs/verification.md).
 
