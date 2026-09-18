@@ -29,7 +29,7 @@ export function validate(input) {
   if (typeof options !== 'object' || Array.isArray(options)) throw fail('INVALID_REQUEST', 'harness_options must be an object');
   for (const [key, value] of Object.entries(options)) {
     if (!['model', 'provider', 'thinking', 'tools'].includes(key)) throw fail('INVALID_REQUEST', `Unsupported harness option: ${key}`);
-    if (key === 'provider' && input.harness !== 'pi' && input.harness !== 'dsh') throw fail('INVALID_REQUEST', 'provider is Pi-specific');
+    if (key === 'provider' && !['pi', 'grok', 'dsh'].includes(input.harness)) throw fail('INVALID_REQUEST', 'provider is unsupported for this harness');
     if (key === 'tools' ? !stringList(value) : typeof value !== 'string' || value.length > 200 || value.startsWith('-')) throw fail('INVALID_REQUEST', `Invalid harness option: ${key}`);
   }
   return { harness: input.harness, cwd: fs.realpathSync(input.cwd), role, task: input.task.trim(), write_scope: input.write_scope || [], no_touch_scope: input.no_touch_scope || [], acceptance: input.acceptance || [], timeout_seconds: timeout, harness_options: options, ...(input.request_key ? { request_key: input.request_key } : {}), ...(input.session ? { session: input.session } : {}), ...(input.resume_from_job_id ? { resume_from_job_id: input.resume_from_job_id } : {}) };
